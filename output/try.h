@@ -27,10 +27,10 @@ typedef char NetworkType;
 typedef int EdgeType;	//边上的权值类型（RIP网络固定为1）
 
 typedef struct RoutingTable {	//路由表结构体 
-	int networkID;	//目的网络地址（局域网编号） 
+	char networkID;	//目的网络地址（局域网编号） 
 	char nextHop;	//下一跳 
 	int distance;	//距离
-}RTable[MAX_ENTRIES];
+} RTable;
 
 typedef struct Neighbor {	//边表结点（邻接路由器）
 	int neighborID;	//邻接点域，存储该顶点对应的下标
@@ -44,9 +44,18 @@ typedef struct Router { //顶点表结点（节点仅考虑路由器，不考虑直连网络）
 	int dirnetworkCount;	//有几个直连网络
 	NetworkType dirNetworkID[MAX_NETWORKS];	//与路由器直连的网络
 	Neighbor* neighbors;	//边表头指针firstedge，指向第一条依附于该顶点的弧的指针
-	RTable routingTable;
+	RTable* routingTable;	//路由表数组
 } Router, RouterList[MAX_ROUTERS];
 
+typedef struct Network {	//相邻路由器组成的图，不将直连网络作为节点
+	RouterList RL;  //存放路由器结点的顺序表
+	//DNList DL;	//存放目的网络信息
+	int routerCount;    //路由器数量
+	int edgeCount;    //路由器直连而成的图的边的数量
+	int networkCount;	//网络的总数
+} Network;
+
+/*
 typedef struct DestNetwork {	//目的网络的结构体
 	NetworkType dnetworkID;
 	int dirrouterCount;	//有几个直连的网络
@@ -54,13 +63,7 @@ typedef struct DestNetwork {	//目的网络的结构体
 	char* road;
 	RTable routingTable;
 }DNet, DNList[MAX_NETWORKS];
-typedef struct Network {	//相邻路由器组成的图，不将直连网络作为节点
-	RouterList RL;  //存放路由器结点的顺序表
-	DNList DL;	//存放目的网络信息
-	int routerCount;    //路由器数量
-	int edgeCount;    //路由器直连而成的图的边的数量
-	int networkCount;	//网络的总数
-} Network;
+*/
 
 /*********
 ********** 数据结构设计
