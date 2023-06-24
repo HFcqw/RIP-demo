@@ -20,18 +20,11 @@ void initNetwork(Network* network) {    //初始化、销毁操作
     for (int i = 0; i < MAX_ROUTERS; ++i) {
         network->RL[i].dirnetworkCount = 0;
         network->RL[i].neighborCount = 0;
+        network->RL[i].rtcount = 0;
         network->RL[i].routerID = NULL;
         network->RL[i].routingTable = NULL;
         network->RL[i].neighbors = NULL;
     }
-    /*
-    if(network->DL != NULL);
-    for (int i = 0; i < MAX_NETWORKS; ++i) {
-        network->DL[i].dnetworkID = NULL;
-        network->DL[i].road = NULL;
-        network->DL[i].dirrouterCount = NULL;
-    }
-    */
 }
 
 void initNetworkFile(Network* network) {   // 采用邻接表存储结构，由文本文件构造整个网络
@@ -151,40 +144,9 @@ void initNeighborCount(Network* network) {  //获取邻居路由器数量，初始化Neighbor
 
 /*********
 * 二、图的基本操作。
-* * 查找图中是否存在某个顶点，获取某个顶点的第一个邻接结点、获取某个顶点的邻接结点的下一个结点
 * * 添加路由器、删除路由器、添加边、删除边、添加直连网络、删除直连网络、销毁图
+* * 查找图中是否存在某个顶点，获取某个顶点的第一个邻接结点、获取某个顶点的邻接结点的下一个结点
 *********/
-
-int getRouterPos(Network* g, RouterType vertex) {    // 查找图g中是否存在顶点v，存在则返回该顶点在图中位置；否则返回 -1
-    for (int i = 0; i < g->routerCount; ++i) {
-        if (g->RL[i].routerID == vertex)
-            return i;
-    }
-    return -1;
-}
-
-int getFirstNeighbor(Network* g, RouterType vertex) { //获取某个顶点的第一个邻接结点
-    int v = getRouterPos(g, vertex);
-    if (v == -1) return -1;
-    Neighbor* p = g->RL[v].neighbors;
-    if (p != NULL) {
-        return p->neighborID;
-    }
-    return -1;
-}
-int getNextNeighbor(Network* g, RouterType vertex1, RouterType vertex2) { //求某个顶点（vertex1）的邻接结点（vertex2）的下一个结点
-    int v1 = getRouterPos(g, vertex1);
-    int v2 = getRouterPos(g, vertex2);
-    if (v1 == -1 || v2 == -1) return -1;
-    Neighbor* p = g->RL[v1].neighbors;
-    while (p != NULL && p->neighborID != v2) {
-        p = p->next;
-    }
-    if (p != NULL && p->next != NULL) {
-        return p->next->neighborID;
-    }
-    return -1;
-}
 
 void insertRouter(Network* network) {
     if (network->routerCount == MAX_ROUTERS) return;
@@ -379,6 +341,37 @@ void deleteDirNetwork(Network* network) {
     }
 }
 
+int getRouterPos(Network* g, RouterType vertex) {    // 查找图g中是否存在顶点v，存在则返回该顶点在图中位置；否则返回 -1
+    for (int i = 0; i < g->routerCount; ++i) {
+        if (g->RL[i].routerID == vertex)
+            return i;
+    }
+    return -1;
+}
+
+int getFirstNeighbor(Network* g, RouterType vertex) { //获取某个顶点的第一个邻接结点
+    int v = getRouterPos(g, vertex);
+    if (v == -1) return -1;
+    Neighbor* p = g->RL[v].neighbors;
+    if (p != NULL) {
+        return p->neighborID;
+    }
+    return -1;
+}
+int getNextNeighbor(Network* g, RouterType vertex1, RouterType vertex2) { //求某个顶点（vertex1）的邻接结点（vertex2）的下一个结点
+    int v1 = getRouterPos(g, vertex1);
+    int v2 = getRouterPos(g, vertex2);
+    if (v1 == -1 || v2 == -1) return -1;
+    Neighbor* p = g->RL[v1].neighbors;
+    while (p != NULL && p->neighborID != v2) {
+        p = p->next;
+    }
+    if (p != NULL && p->next != NULL) {
+        return p->next->neighborID;
+    }
+    return -1;
+}
+
 /*********
 * 三、路由器初始化路由表
 *********/
@@ -386,6 +379,7 @@ int initRoutingTable(Router* router) {  //目的网络 距离 下一跳
     int i, j = 0, k;
     RTable *r;
     if (router->dirnetworkCount == 0) return -1;
+    router->rtcount = router->dirnetworkCount;  //初始化路由表条目，等于直连网络数
     r = (RTable*)malloc(sizeof(RTable)* router->dirnetworkCount);    //生成一个新节点
     assert(r != NULL);
     printf("\t\t路由器 %c 的路由表\n", router->routerID);
@@ -395,8 +389,7 @@ int initRoutingTable(Router* router) {  //目的网络 距离 下一跳
         r[i].nextHop = '-';
         r[i].networkID = router->dirNetworkID[i];
         router->routingTable = r;
-        printf("\t\t%6c%7d%7c", r[i].networkID, r[i].distance, r[i].nextHop);
-        //printf("\t\t%6c%7d%7c", router->routingTable[i].networkID, router->routingTable[i].distance, router->routingTable[i].nextHop);
+        printf("\t\t%6c%7d%7c", router->routingTable[i].networkID, router->routingTable[i].distance, router->routingTable[i].nextHop);
         printf("\n");
     }
     printf("\n");
@@ -404,130 +397,84 @@ int initRoutingTable(Router* router) {  //目的网络 距离 下一跳
 
 /*********
 * 四、路由器发送路由更新信息给邻居路由器-处理路由信息更新-发送路由更新信息给邻居路由器
+* updateRoutingTable函数中，首先初始化路由表项，然后根据直连邻居的信息更新路由表项。之后，通过迭代更新的方式进行路由选择和路由更新，直到没有更新时停止。
 *********/
 
-void updateRoutingTable(Router* router, int networkID, int nextHop, int distance) {
-    for (int i = 0; i < MAX_NETWORKS; i++) {
-        if (router->routingTable[i].networkID == networkID) {
-            router->routingTable[i].nextHop = nextHop;
-            router->routingTable[i].distance = distance;
-            return;
-        }
+Router* inputRouter(Network network) {
+input:
+    printf("\t\t请输入需要触发更新的路由器名称：");
+    char routerID;
+    scanf_s("\n%c", &routerID);
+    //putchar(routerID);
+    //printf("666");
+    if (routerID == '\n') exit(-1);
+    Router* router = NULL;
+    if (getRouterPos(&network, routerID) == -1) {
+        printf("\n\t\t路由器 not found\n\n");
+        goto input;
     }
+    else return router = &network.RL[getRouterPos(&network, routerID)];    // 查找指定路由器ID，返回路由器结构体指针
 }
 
-void processRoutingUpdate(Router* router, int senderID, int networkID, int distance) {
-    Neighbor* neighbor = router->neighbors;
-    while (neighbor != NULL) {
-        if (neighbor->neighborID == senderID) {
-            int newDistance = distance + neighbor->distance;
-            updateRoutingTable(router, networkID, senderID, newDistance);
-            return;
-        }
-        int newDistance = distance + neighbor->distance;
-        updateRoutingTable(router, networkID, senderID, newDistance);
-        return;
-        neighbor = neighbor->next;
-    }
-}
-char inputRouterID() {
-    char routerID = 'A';
-    printf("\t\t请输入需要触发更新的路由器名称：");
-    printf("%c\n\n", routerID);
-    /*
-    scanf_s("%c", &routerID,sizeof(routerID));
-    getchar();
-    printf("%c", routerID);
-    putchar(routerID);
-    */
-    if (routerID == ' '|| routerID == NULL) {
-        printf("\t\t没有输入\n");
-        exit(-1);
-    }
-    else return routerID;
-}
-void triggerUpdate(Network* network,RouterType routerID) {    //触发更新
-    Router* router = NULL;
-    if (getRouterPos(network, routerID) == -1) {    
-        printf("\t\t路由器 %c not found\n", routerID); 
-        return;
-    }
-    router = &network->RL[getRouterPos(network, routerID)];    // 查找指定路由器ID
-    int count = router->dirnetworkCount;
+void triggerUpdate(Network* network, Router* router) {    //路由选择和路由更新
+    int i, j, k;
     Neighbor* neighbor = router->neighbors;
     RTable* rtable;
-    int i, j, k;
     while (neighbor != NULL) {  // 遍历邻居路由表集合，接收每个邻居发送的路由信息，更新本路由器的路由表
         i = neighbor->neighborID;
-        printf("\t\t路由器 %c 是 %c 的邻接路由器\n", network->RL[i].routerID, routerID);
-        rtable = (RTable*)malloc(sizeof(RTable) * network->RL[i].dirnetworkCount);   //更新邻居路由表
-        printf("\t\t路由器 %c 发给 %c 的路由更新信息\n", network->RL[i].routerID, routerID);
+        printf("\t\t路由器 %c 是 %c 的邻接路由器\n", network->RL[i].routerID, router->routerID);
+        rtable = (RTable*)malloc(sizeof(RTable) * network->RL[i].rtcount);   //创建临时路由表，存放邻居路由器发送的路由表
+        printf("\t\t路由器 %c 发给 %c 的路由更新信息\n", network->RL[i].routerID, router->routerID);
         printf("\t\t目的网络   距离   下一跳路由器\n");
-        for (j = 0; j < network->RL[i].dirnetworkCount; j++) {  // 路由更新目标网络ID、距离和下一跳路由器
+        for (j = 0; j < network->RL[i].rtcount; j++) {  // 路由更新目标网络ID、距离和下一跳路由器
             rtable[j].distance = network->RL[i].routingTable[j].distance + 1;
             rtable[j].nextHop = network->RL[i].routerID;
             rtable[j].networkID = network->RL[i].routingTable[j].networkID;
             printf("\t\t%6c%7d%7c\n", rtable[j].networkID, rtable[j].distance, rtable[j].nextHop);
         }
         printf("\n");
-        /*
-        for (k = 0; router->routingTable != NULL; k++) {
-            for (j = 0; j < network->RL[i].dirnetworkCount; j++) {
-                if (router->routingTable[k].networkID == rtable[j].networkID) { //异常
-                    if (router->routingTable[k].distance > rtable[j].distance && rtable[j].distance <= 15) {    //更新距离
-                        router->routingTable[k].nextHop = rtable[j].nextHop;
-                        router->routingTable[k].distance = rtable[j].distance;
-                        router->routingTable[k].networkID = rtable[j].networkID;
-                        break;
+
+        for (int j = 0; j < network->RL[i].rtcount; j++) {  //外层循环是邻居路由器的路由表的路由条目数，内层循环是本路由器的路由条目数   
+            int index = j;
+            int* rtnum = (int*)malloc(sizeof(int) * network->RL[i].rtcount);
+            for (int k = 0; k < router->rtcount; k++) { //将路由表中原有的所有条目与每一条新收到的路由条目比对，查找是否有新的网络或新的路径
+                if (router->routingTable[k].networkID == network->RL[i].routingTable[j].networkID && router->routingTable[k].nextHop == network->RL[i].routingTable[j].nextHop && network->RL[i].routingTable[j].nextHop!= router->routerID) {    //如果网络号相等并且下一跳也相等，则不是新的网络也不是新的路径，路由表中已经存在这个网络及路径的记录；
+                    index = -1;
+                    if (router->routingTable[j].distance > rtable[k].distance && rtable[k].distance < INFINITY) {    //判断是否需要修改路由表中原有的路由条目（更新距离）
+                        router->routingTable[j].nextHop = rtable[k].nextHop;
+                        router->routingTable[j].distance = rtable[k].distance;
+                        router->routingTable[j].networkID = rtable[k].networkID;
+                        //printf("\t\t%6c%7d%7c\n", router->routingTable[j].networkID, router->routingTable[j].distance, router->routingTable[j].nextHop);
                     }
-                    else continue;
+                    break;  //路由表中已经存在这个网络及路径，退出本层循环，执行下一轮外层循环
                 }
-                else {  //添加路由器
-                    RTable* rt = (RTable*)malloc(sizeof(RTable));
-                    rt->distance = rtable[j].distance;
-                    rt->networkID = rtable[j].networkID;
-                    rt->nextHop = rtable[j].nextHop;
-                    router->routingTable[count] = *rt;
+            }
+            if (index != -1) { //给路由器的路由表添加新的路由条目（路由表中还没有这个网络）
+                if (router->rtcount < MAX_ENTRIES) {
+                    RTable* rtable2 = (RTable*)malloc(sizeof(RTable) * 1);   //创建临时路由表2，存放一条来自邻居路由器新的路由条目，随后添加到本路由器的路由表中
+                    rtable2->distance = rtable[index].distance;
+                    rtable2->networkID = rtable[index].networkID;
+                    rtable2->nextHop = rtable[index].nextHop;
+                    router->routingTable[router->rtcount] = *rtable2;
+                    //printf("\t\t%6c%7d%7c\n", rtable2->networkID, rtable2->distance, rtable2->nextHop);
+                    router->rtcount++;
+                    //printf("\t\t%d\n", router->rtcount);
+                }
+                else {
+                    printf("\t\t路由器 %c 的路由表中的路由条目数已达最大值，不能再添加路由条目", router->routerID);
+                    exit(-1);
                 }
             }
         }
-        */
-        printf("\t\t路由器 %c 更新后的路由表\n", routerID);
+        printf("\t\t路由器 %c 更新后的路由表\n", router->routerID);
         printf("\t\t目的网络   距离   下一跳路由器\n");
-        for (j = 0; j < router->dirnetworkCount; j++) {  // 路由更新目标网络ID、距离和下一跳路由器
-            printf("\t\t%6c%7d%7c\n", rtable[j].networkID, rtable[j].distance, rtable[j].nextHop);
+        for (j = 0; j < router->rtcount; j++) {  // 路由更新目标网络ID、距离和下一跳路由器
+            printf("\t\t%6c%7d%7c\n", router->routingTable[j].networkID, router->routingTable[j].distance, router->routingTable[j].nextHop);
         }
         printf("\n");
         neighbor = neighbor->next;
     }
 }
-/*
-* 	int i, j;
-    for (i = 0; i < *count2; i++) {
-        rtu[i].d++;
-    }
-    printf("距离向量加1后的路由表\n");
-    prt(rtu, *count2);
-    for (i = 0; i < *count2; i++) {      //根据接收的路边表，一项一项进行比对
-        for (j = 0; j < *count; j++) {
-            if (rt[j].tn == rtu[i].tn) { //如果原来有该目标网络表项
-                if (rt[j].next == rtu[i].next) { //如果下一跳地址一样，则直接用新的覆盖原来的
-                    rt[j].d = rtu[i].d;
-                }
-                else if (rt[j].d > rtu[i].d) {
-                    //如果下一跳地址不同，则比较两个表项哪个距离更小
-                    rt[j].next = rtu[i].next;
-                    rt[j].d = rtu[i].d;
-                }
-                break;
-            }
-        }
-        if (j >= *count) { //如果发来的路由表中有表项在原来rt表中没有，则直接插入到rt表中
-            insertTable(rt, count, rtu[i].tn, rtu[i].d, rtu[i].next);
-        }
-    }
-}
-*/
 
 int selectBestRoute(Router* router, int networkID) {    //选择最佳路由
     int i;
@@ -544,38 +491,6 @@ int selectBestRoute(Router* router, int networkID) {    //选择最佳路由
     return bestRoute;
 }
 
-/*
-void updateRoutingTable(Network* network, Router* router, int senderId, int numNetworks, int networks[], int metrics[],RTable* routingTable) {
-
-    for (int i = 0; i < network->networkCount; i++) {
-        int network = networks[i];
-        int metric = metrics[i];
-
-        // 查找网络在路由表中的位置
-        int index = -1;
-        for (int j = 0; j < router->dirnetworkCount; j++) {
-            if (router->dirNetworkID[j] == network) {
-                index = j;
-                break;
-            }
-        }
-        if (index != -1) {
-            // 毒性逆转
-            if (senderId == router->routingTable[senderId][index].nextHop && metric == INFINITY) {
-                router->routingTable[senderId][index].metric = INFINITY;
-            } else {
-                // 更新路由表条目
-                int currentMetric = router->routingTable[senderId][index].metric;
-                if (metric + 1 < currentMetric) {
-                    router->routingTable[senderId][index].nextHop = senderId;
-                    router->routingTable[senderId][index].metric = metric + 1;
-                }
-            }
-        }
-    }
-}
-*/
-
 /*********
 * 五、打印运行结果
 *********/
@@ -587,9 +502,10 @@ void displayRoutingTable(Network network) { // 显示路由表内容
     for (int i = 0; i < network.routerCount; i++) {
         printf("\t\t路由器 % c 的路由表\n",network.RL[i].routerID);
         printf("\t\t目的网络   距离   下一跳路由器\n");
-        for (int j = 0; j < network.RL[i].dirnetworkCount;j++) {
+        for (int j = 0; j < network.RL[i].rtcount;j++) {
             printf("\t\t%6c%7d%7c\n", network.RL[i].routingTable[j].networkID, network.RL[i].routingTable[j].distance, network.RL[i].routingTable[j].nextHop);
         }
+        //printf("\n");
     }
 }
 void displayNetworkSetting(Network network) {   // 显示网络配置
@@ -751,7 +667,7 @@ start:
         for (int i = 0; i < network.routerCount; i++) {
             initRoutingTable(&network.RL[i]);
         }
-        triggerUpdate(&network, inputRouterID());
+        triggerUpdate(&network, inputRouter(network));
         printf("\t\t打印运行结果：\n");
         displayRoutingTable(network);
         /*

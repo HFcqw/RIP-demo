@@ -16,7 +16,7 @@
 #define OVERFLOW -2
 
 #define MAX_ROUTERS 20	//设RIP网络中路由器数最大为20
-#define MAX_NETWORKS 20	//设网络数最大为10
+#define MAX_NETWORKS 4	//设每个路由器的直连网络数最大为4
 #define MAX_ENTRIES 25	//一个RIP报文最多可包含25个路由
 #define INFINITY 16	//一条通路上最多可包含的路由器数量是15个,16跳中止
 
@@ -45,11 +45,11 @@ typedef struct Router { //顶点表结点（节点仅考虑路由器，不考虑直连网络）
 	NetworkType dirNetworkID[MAX_NETWORKS];	//与路由器直连的网络
 	Neighbor* neighbors;	//边表头指针firstedge，指向第一条依附于该顶点的弧的指针
 	RTable* routingTable;	//路由表数组
+	int rtcount;
 } Router, RouterList[MAX_ROUTERS];
 
 typedef struct Network {	//相邻路由器组成的图，不将直连网络作为节点
 	RouterList RL;  //存放路由器结点的顺序表
-	//DNList DL;	//存放目的网络信息
 	int routerCount;    //路由器数量
 	int edgeCount;    //路由器直连而成的图的边的数量
 	int networkCount;	//网络的总数
