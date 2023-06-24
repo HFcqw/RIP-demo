@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <windows.h>
 #include <string.h>
+#include <windows.h>
 #include <malloc.h>
 #include <time.h>
 #include<assert.h>
@@ -17,7 +17,7 @@
 
 #define MAX_ROUTERS 20	//设RIP网络中路由器数最大为20
 #define MAX_NETWORKS 20	//设网络数最大为10
-#define MAX_ENTRIES 20	//路由表20条条目
+#define MAX_ENTRIES 25	//一个RIP报文最多可包含25个路由
 #define INFINITY 16	//一条通路上最多可包含的路由器数量是15个,16跳中止
 
 typedef int Status;  // Status是函数的类型,其值是函数结果状态代码，如OK等
