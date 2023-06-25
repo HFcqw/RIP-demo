@@ -6,7 +6,7 @@
 #include <malloc.h>
 #include <time.h>
 #include<assert.h>
-
+#pragma executin_charater_set("utf-8")
 // 函数结果状态代码
 #define TRUE 1
 #define FALSE 0

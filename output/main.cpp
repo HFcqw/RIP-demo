@@ -7,8 +7,9 @@ void initNeighborCount(Network* network);
 int getRouterPos(Network* g, RouterType vertex);
 int getFirstNeighbor(Network* g, RouterType vertex);
 int getNextNeighbor(Network* g, RouterType vertex1, RouterType vertex2);
-
-
+int initRoutingTable(Router* router);
+void triggerUpdate(Network* network, RouterType routerID);
+void updateRouter(Network* network, RouterType routerID);
 /*********
 * Ò»¡¢³õÊ¼»¯¡£ÅäÖÃÂ·ÓÉÆ÷µÄÍ¼ºÍÖ±Á¬ÍøÂç£¨ÊÖ¶¯ÊäÈë»ò¶ÁÈ¡ÎÄ¼ş£©
 *********/
@@ -98,7 +99,7 @@ void initRouter(Network* network) {    // ÊÖ¶¯ÊäÈëÍøÂçÂ·ÓÉÆ÷ÅäÖÃ
         network->RL[i].neighbors = NULL;    //³õÊ¼»¯±íÍ·Ö¸ÕëÓòÎªNULL
     }
     for (k = 0; k < network->edgeCount; k++) {  
-        printf("\t\tÇëÊäÈë±ß£¨Vi,Vj£©ÉÏµÄ¶¥µãĞòºÅ¶Ôi j£¨ÊäÈëÕûĞÍÊı×Ö£¬ÒÔ¿Õ¸ñ¼ä¸ô£¬¸ñÊ½£º0 1£©£º\n\t\t");
+        printf("\t\tÇëÊäÈë±ß£¨Vi,Vj£©ÉÏµÄ¶¥µãĞòºÅ¶Ôi j£¨ÊäÈëÕûÊı£¬ÒÔ¿Õ¸ñ¼ä¸ô£¬¸ñÊ½£º0 1£©£º\n\t\t");
         scanf_s("%d %d", &i, &j);   //ÊäÈëeĞĞÊı¾İ¶Ô£¬±íÊ¾Ã¿Ìõ±ßµÄÁ½¸ö¶¥µã±àºÅ,¹¹½¨ÁÚ½Ó±í£¨±ß¼¯£©
         e = (Neighbor*)malloc(sizeof(Neighbor));    //Éú³ÉÒ»¸öĞÂ½Úµã
         e->neighborID = j;
@@ -115,7 +116,7 @@ void initDesNetwork(Network* network) {    // ÊÖ¶¯ÅäÖÃÂ·ÓÉÆ÷µÄÖ±Á¬ÍøÂç
     printf("\t\tÇëÊäÈëÍøÂç×ÜÊı£¨ÊäÈëÕûĞÍÊı×Ö£©:\n\t\t");
     scanf_s("%d", &network->networkCount);
     for (i = 0; i < network->routerCount; i++) {
-        printf("\t\tÇëÊäÈëÂ·ÓÉÆ÷ %c µÄÖ±Á¬ÍøÂçÊı£¨ÊäÈëÕûĞÍÊı×Ö£©:\n\t\t", network->RL[i].routerID);
+        printf("\t\tÇëÊäÈëÂ·ÓÉÆ÷ %c µÄÖ±Á¬ÍøÂçÊı£¨ÊäÈëÕûÊı£©:\n\t\t", network->RL[i].routerID);
         scanf_s("%d", &network->RL[i].dirnetworkCount);
         //printf("%d", network->RL[i].dirnetworkCount);
         for (j = 0; j < network->RL[i].dirnetworkCount; j++) {
@@ -404,13 +405,14 @@ input:
     printf("\t\tÇëÊäÈëĞèÒª´¥·¢¸üĞÂµÄÂ·ÓÉÆ÷Ãû³Æ£º");
     char routerID;
     scanf_s("\n%c", &routerID);
-    //putchar(routerID);
-    //printf("666");
     if (getRouterPos(&network, routerID) == -1) {
         printf("\n\t\tÂ·ÓÉÆ÷ not found\n\n");
         goto input;
     }
-    else return routerID;
+    else {
+        printf("\n\t\t/***ÁÚ½ÓÂ·ÓÉÆ÷%cµÄ´¥·¢¸üĞÂ£º***/\n", routerID);
+        return routerID;
+    }
 }
 
 void triggerUpdate(Network* network, RouterType routerID) {    //Â·ÓÉÑ¡ÔñºÍÂ·ÓÉ¸üĞÂ
@@ -423,11 +425,9 @@ void triggerUpdate(Network* network, RouterType routerID) {    //Â·ÓÉÑ¡ÔñºÍÂ·ÓÉ¸
     while (neighbor != NULL && (updateFlag == 0)) {  // ±éÀúÁÚ¾ÓÂ·ÓÉ±í¼¯ºÏ£¬½ÓÊÕÃ¿¸öÁÚ¾Ó·¢ËÍµÄÂ·ÓÉĞÅÏ¢£¬¸üĞÂ±¾Â·ÓÉÆ÷µÄÂ·ÓÉ±í
         int updateFlag = 0;
         i = neighbor->neighborID;
-        printf("\t\tÂ·ÓÉÆ÷ %c ÊÇ %c µÄÁÚ½ÓÂ·ÓÉÆ÷\n", network->RL[i].routerID, router->routerID);
         rtable = (RTable*)malloc(sizeof(RTable) * network->RL[i].rtcount);   //´´½¨ÁÙÊ±Â·ÓÉ±í£¬´æ·ÅÁÚ¾ÓÂ·ÓÉÆ÷·¢ËÍµÄÂ·ÓÉ±í
-        printf("\t\tÂ·ÓÉÆ÷ %c ·¢¸ø %c µÄÂ·ÓÉ¸üĞÂĞÅÏ¢", network->RL[i].routerID, router->routerID);
-        printf("£¨ %d ĞĞÂ·ÓÉÌõÄ¿£©\n", network->RL[i].rtcount);
-        printf("\t\tÄ¿µÄÍøÂç   ¾àÀë   ÏÂÒ»ÌøÂ·ÓÉÆ÷\n");
+        printf("\t\tÂ·ÓÉĞÅÏ¢£ºÁÚ½ÓÂ·ÓÉÆ÷ %c -> Â·ÓÉÆ÷ %c £¬¾ßÌåÈçÏÂ\n", network->RL[i].routerID, router->routerID);
+        printf("\t\tÄ¿µÄÍøÂç   ¾àÀë   ÏÂÒ»ÌøÂ·ÓÉÆ÷\n"); 
         for (j = 0; j < network->RL[i].rtcount; j++) {  // Â·ÓÉ¸üĞÂÄ¿±êÍøÂçID¡¢¾àÀëºÍÏÂÒ»ÌøÂ·ÓÉÆ÷
             rtable[j].distance = network->RL[i].routingTable[j].distance + 1;
             rtable[j].nextHop = network->RL[i].routerID;
@@ -438,42 +438,53 @@ void triggerUpdate(Network* network, RouterType routerID) {    //Â·ÓÉÑ¡ÔñºÍÂ·ÓÉ¸
 
         for (int j = 0; j < network->RL[i].rtcount; j++) {  //Íâ²ãÑ­»·ÊÇÁÚ¾ÓÂ·ÓÉÆ÷µÄÂ·ÓÉ±íµÄÂ·ÓÉÌõÄ¿Êı£¬ÄÚ²ãÑ­»·ÊÇ±¾Â·ÓÉÆ÷µÄÂ·ÓÉÌõÄ¿Êı   
             int index = j;
-            int* rtnum = (int*)malloc(sizeof(int) * network->RL[i].rtcount);
+            //int* rtnum = (int*)malloc(sizeof(int) * network->RL[i].rtcount);
             for (int k = 0; k < router->rtcount; k++) { //½«Â·ÓÉ±íÖĞÔ­ÓĞµÄËùÓĞÌõÄ¿ÓëÃ¿Ò»ÌõĞÂÊÕµ½µÄÂ·ÓÉÌõÄ¿±È¶Ô£¬²éÕÒÊÇ·ñÓĞĞÂµÄÍøÂç»òĞÂµÄÂ·¾¶
-                if (router->routingTable[k].networkID == network->RL[i].routingTable[j].networkID && router->routingTable[k].nextHop == network->RL[i].routingTable[j].nextHop && network->RL[i].routingTable[j].nextHop != router->routerID) {    //Èç¹ûÍøÂçºÅÏàµÈ²¢ÇÒÏÂÒ»ÌøÒ²ÏàµÈ£¬Ôò²»ÊÇĞÂµÄÍøÂçÒ²²»ÊÇĞÂµÄÂ·¾¶£¬Â·ÓÉ±íÖĞÒÑ¾­´æÔÚÕâ¸öÍøÂç¼°Â·¾¶µÄ¼ÇÂ¼£»
+                if (router->routingTable[k].networkID == network->RL[i].routingTable[j].networkID && router->routingTable[k].nextHop == network->RL[i].routingTable[j].nextHop && network->RL[i].routingTable[j].nextHop != router->routerID) {    //Èç¹ûÍøÂçºÅÏàµÈ²¢ÇÒÏÂÒ»ÌøÒ²ÏàµÈ£¨ÇÒÏÂÒ»Ìø²»ÊÇ±¾Â·ÓÉÆ÷£©£¬Ôò²»ÊÇĞÂµÄÍøÂçÒ²²»ÊÇĞÂµÄÂ·¾¶£¬Â·ÓÉ±íÖĞÒÑ¾­´æÔÚÕâ¸öÍøÂç¼°Â·¾¶µÄ¼ÇÂ¼£»
                     index = -1;
-                    if (router->routingTable[j].distance > rtable[k].distance && rtable[k].distance < INFINITY) {    //ÅĞ¶ÏÊÇ·ñĞèÒªĞŞ¸ÄÂ·ÓÉ±íÖĞÔ­ÓĞµÄÂ·ÓÉÌõÄ¿£¨¸üĞÂ¾àÀë£©
-                        router->routingTable[j].nextHop = rtable[k].nextHop;
-                        router->routingTable[j].distance = rtable[k].distance;
-                        router->routingTable[j].networkID = rtable[k].networkID;
-                        printf("\t\t%6c%7d%7c\n", router->routingTable[j].networkID, router->routingTable[j].distance, router->routingTable[j].nextHop);
-                    }
+                    if (router->routingTable[k].distance > rtable[j].distance && rtable[j].distance < INFINITY) {    //ÅĞ¶ÏÊÇ·ñĞèÒªĞŞ¸ÄÂ·ÓÉ±íÖĞÔ­ÓĞµÄÂ·ÓÉÌõÄ¿£¨¸üĞÂ¾àÀë£©
+                        router->routingTable[k].nextHop = rtable[j].nextHop;
+                        router->routingTable[k].distance = rtable[j].distance;
+                        router->routingTable[k].networkID = rtable[j].networkID;
+                        printf("//ĞŞ¸ÄµÄÂ·ÓÉÎª£º%6c%7d%7c\n",j ,router->routingTable[k].networkID, router->routingTable[k].distance, router->routingTable[k].nextHop);
+                    } 
                     break;  //Â·ÓÉ±íÖĞÒÑ¾­´æÔÚÕâ¸öÍøÂç¼°Â·¾¶£¬ÍË³ö±¾²ãÑ­»·£¬Ö´ĞĞÏÂÒ»ÂÖÍâ²ãÑ­»·
                 }
-                /*
-                
-                else if (router->routingTable[k].networkID == network->RL[i].routingTable[j].networkID && router->routingTable[k].nextHop == network->RL[i].routingTable[j].nextHop && router->routingTable[j].distance <= rtable[k].distance) {
-                    updateFlag = 1;
-                    index = -1;
-                    break;
-                }
-                else continue;
-                */
             }
-            if (index != -1) { //¸øÂ·ÓÉÆ÷µÄÂ·ÓÉ±íÌí¼ÓĞÂµÄÂ·ÓÉÌõÄ¿£¨Â·ÓÉ±íÖĞ»¹Ã»ÓĞÕâ¸öÍøÂç£©
+            if (index != -1) { //¸øÂ·ÓÉÆ÷µÄÂ·ÓÉ±íÌí¼ÓĞÂµÄÂ·ÓÉÌõÄ¿£¨Â·ÓÉ±íÖĞ»¹Ã»ÓĞÕâ¸öÍøÂç£©,ÍøÂçºÅ²»Í¬¡¢¾àÀë¸ü¶Ì»ò¾àÀëÏàµÈµ«ÏÂÒ»Ìø²»Í¬
                 if (router->rtcount < MAX_ENTRIES) {
-                    RTable* rtable2 = (RTable*)malloc(sizeof(RTable) * 1);   //´´½¨ÁÙÊ±Â·ÓÉ±í2£¬´æ·ÅÒ»ÌõÀ´×ÔÁÚ¾ÓÂ·ÓÉÆ÷ĞÂµÄÂ·ÓÉÌõÄ¿£¬ËæºóÌí¼Óµ½±¾Â·ÓÉÆ÷µÄÂ·ÓÉ±íÖĞ
-                    rtable2->distance = rtable[index].distance;
-                    rtable2->networkID = rtable[index].networkID;
-                    rtable2->nextHop = rtable[index].nextHop;
-                    router->routingTable[router->rtcount] = *rtable2;
-                    //printf("\t\t%6c%7d%7c\n", rtable2->networkID, rtable2->distance, rtable2->nextHop);
-                    router->rtcount++;
-                    //printf("\t\t%d\n", router->rtcount);
+                    updateFlag = 0; 
+                    for (int k = 0; k < router->rtcount; k++) { //Íâ²ãÑ­»·ÊÇÁÚ¾ÓÂ·ÓÉÆ÷µÄÂ·ÓÉ±íµÄÂ·ÓÉÌõÄ¿Êı£¬ÄÚ²ãÑ­»·ÊÇ±¾Â·ÓÉÆ÷µÄÂ·ÓÉÌõÄ¿Êı
+                        if (router->routingTable[k].networkID == rtable[index].networkID && router->routingTable[k].nextHop == rtable[index].nextHop && rtable[index].nextHop != router->routerID && router->routingTable[k].distance >= rtable[index].distance) {  
+                            updateFlag = 1; //Â·ÓÉ»·Â·
+                            printf("\t\tÂ·ÓÉÆ÷ %c ¸üĞÂºóµÄÂ·ÓÉ±í\n", router->routerID);
+                            printf("\t\tÄ¿µÄÍøÂç   ¾àÀë   ÏÂÒ»ÌøÂ·ÓÉÆ÷\n");
+                            for (j = 0; j < router->rtcount; j++) {  // Â·ÓÉ¸üĞÂÄ¿±êÍøÂçID¡¢¾àÀëºÍÏÂÒ»ÌøÂ·ÓÉÆ÷
+                                printf("\t\t%6c%7d%7c\n", router->routingTable[j].networkID, router->routingTable[j].distance, router->routingTable[j].nextHop);
+                            }
+                            printf("\n\t\t/***Â·ÓÉÆ÷ %c µÄÂ·ÓÉÒÑ¾­ÊÕÁ²£¬²»ĞèÒªÔÙÌí¼ÓÂ·ÓÉÌõÄ¿***/\n\n", router->routerID);
+                            return;
+                        }
+                    }
+                    int Flag = 1;
+                    for (int k = 0; k < router->rtcount; k++) { //Íâ²ãÑ­»·ÊÇÁÚ¾ÓÂ·ÓÉÆ÷µÄÂ·ÓÉ±íµÄÂ·ÓÉÌõÄ¿Êı£¬ÄÚ²ãÑ­»·ÊÇ±¾Â·ÓÉÆ÷µÄÂ·ÓÉÌõÄ¿Êı
+                        if(router->routingTable[k].networkID == rtable[index].networkID && router->routingTable[k].distance < rtable[index].distance)
+                        Flag = 0;
+                    }
+                    if (Flag == 1) {
+                        RTable* rtable2 = (RTable*)malloc(sizeof(RTable) * 1);   //´´½¨ÁÙÊ±Â·ÓÉ±í2£¬´æ·ÅÒ»ÌõÀ´×ÔÁÚ¾ÓÂ·ÓÉÆ÷ĞÂµÄÂ·ÓÉÌõÄ¿£¬ËæºóÌí¼Óµ½±¾Â·ÓÉÆ÷µÄÂ·ÓÉ±íÖĞ
+                        rtable2->distance = rtable[index].distance;
+                        rtable2->networkID = rtable[index].networkID;
+                        rtable2->nextHop = rtable[index].nextHop;
+                        router->routingTable[router->rtcount] = *rtable2;
+                        //printf("//Ìí¼ÓµÄÂ·ÓÉÎª£º%6c%7d%7c\n", rtable2->networkID, rtable2->distance, rtable2->nextHop);
+                        router->rtcount++;
+                    }
+                    else continue;
                 }
                 else {
-                    printf("\t\tÂ·ÓÉÆ÷ %c µÄÂ·ÓÉ±íÖĞµÄÂ·ÓÉÌõÄ¿ÊıÒÑ´ï×î´óÖµ£¬²»ÄÜÔÙÌí¼ÓÂ·ÓÉÌõÄ¿", router->routerID);
-                    exit(-1);
+                    printf("\t\t/***Â·ÓÉÆ÷ %c µÄÂ·ÓÉ±íÖĞµÄÂ·ÓÉÌõÄ¿ÊıÒÑ´ï×î´óÖµ£¬²»ÄÜÔÙÌí¼ÓÂ·ÓÉÌõÄ¿***/\n\n", router->routerID);
+                    return;
                 }
             }
         }
@@ -484,19 +495,32 @@ void triggerUpdate(Network* network, RouterType routerID) {    //Â·ÓÉÑ¡ÔñºÍÂ·ÓÉ¸
         }
         printf("\n");
         neighbor = neighbor->next;
+        //Sleep(3000); //Ã¿¼ä¸ô3000ms¾Í¸üĞÂÒ»´ÎÂ·ÓÉÆ÷
     }
-    //´òÓ¡AµÄÁÚ½ÓÂ·ÓÉÆ÷µÄÁÚ½ÓÂ·ÓÉÆ÷
-    //triggerUpdate(network, 'C');
-    /*
-    router = &network->RL[getRouterPos(network, routerID)];
-    neighbor = router->neighbors;
+    updateRouter(network, routerID);
+}
+
+void updateRouter(Network* network, RouterType routerID) {
+    Router* router = NULL;
+    router = &network->RL[getRouterPos(network, routerID)];    // ²éÕÒÖ¸¶¨Â·ÓÉÆ÷ID
+    int i, j, k;
+    Neighbor* neighbor = router->neighbors;
+    RTable* rtable;
+    int updateFlag = 0;
     char NRouterID = network->RL[neighbor->neighborID].routerID;
-    while(neighbor != NULL && NRouterID != router->routerID) {
+    while (neighbor != NULL && NRouterID != router->routerID && updateFlag != 1) {  //±éÀúAµÄÁÚ½ÓÂ·ÓÉÆ÷
         NRouterID = network->RL[neighbor->neighborID].routerID;
-        printf("\t\t%c\n", NRouterID);
+        printf("\t\t/***ÁÚ½ÓÂ·ÓÉÆ÷%cµÄ´¥·¢¸üĞÂ£º***/\n\n", NRouterID);
         triggerUpdate(network, NRouterID);
         neighbor = neighbor->next;
     }
+    /*
+    router = &network->RL[getRouterPos(network, routerID)];    // ²éÕÒÖ¸¶¨Â·ÓÉÆ÷ID
+    neighbor = router->neighbors;
+    updateFlag = 0;
+    NRouterID = network->RL[neighbor->neighborID].routerID;
+    printf("\t\t/***ÁÚ½ÓÂ·ÓÉÆ÷%cµÄ´¥·¢¸üĞÂ£º/***\n\n", NRouterID);
+    triggerUpdate(network, NRouterID);
     */
 }
 
@@ -524,7 +548,7 @@ void displayRoutingTable(Network network) { // ÏÔÊ¾Â·ÓÉ±íÄÚÈİ
     //printf("\t\tNetworkID   Distance   Next Hop\n");
     
     for (int i = 0; i < network.routerCount; i++) {
-        printf("\t\tÂ·ÓÉÆ÷ % c µÄÂ·ÓÉ±í£¨ÓĞ %d ĞĞÂ·ÓÉĞÅÏ¢£©\n",network.RL[i].routerID, network.RL[i].rtcount);
+        printf("\t\tÂ·ÓÉÆ÷ % c µÄÂ·ÓÉ±í\n",network.RL[i].routerID);
         printf("\t\tÄ¿µÄÍøÂç   ¾àÀë   ÏÂÒ»ÌøÂ·ÓÉÆ÷\n");
         for (int j = 0; j < network.RL[i].rtcount;j++) {
             printf("\t\t%6c%7d%7c\n", network.RL[i].routingTable[j].networkID, network.RL[i].routingTable[j].distance, network.RL[i].routingTable[j].nextHop);
@@ -575,7 +599,6 @@ void displayNetworkSetting(Network network) {   // ÏÔÊ¾ÍøÂçÅäÖÃ
 }
 void login_func(Network network) {   //ÏµÍ³²Ëµ¥
 start:
-    printf("\n");
     printf("\t\t-------------------------------------------------\n");
     printf("\t\t|||||       »¶Ó­Ê¹ÓÃRIPÄ£ÄâÑİÊ¾ÏµÍ³£¡       |||||\n");
     printf("\t\t----------------------     ----------------------\n");
@@ -607,9 +630,9 @@ start:
     printf("\t\t----------------------     ----------------------\n");
     printf("\t\t**************    ¡ª¡ª by @ccy ¡ª¡ª    **************\n");
     printf("\t\t-------------------------------------------------\n\n");
-    int n;
     printf("\t\tÇëÊäÈëÑ¡Ïî¶ÔÓ¦µÄÊı×Ö£º");
-    scanf_s("%d", &n);
+    int n;
+    scanf_s("\n%d", &n);
     switch (n) {
     case 0: system("cls");
         printf("\t\tµ±Ç°ÍøÂçÁ¬½ÓµÄÅäÖÃÈçÏÂ£º\n\n");
@@ -692,19 +715,9 @@ start:
             initRoutingTable(&network.RL[i]);
         }
         triggerUpdate(&network, inputRouterID(network));
-        printf("\t\t´òÓ¡ÔËĞĞ½á¹û£º\n");
+        printf("\n\t\t´òÓ¡ÔËĞĞ½á¹û£º\n");
         displayRoutingTable(network);
-        /*
-        while (1) {
-            Sleep(3000); //Ã¿¼ä¸ô3000ms¾Í¸üĞÂÒ»´ÎÂ·ÓÉÆ÷ 
-            receiveRIP(rtu, &count2); //ÊÕµ½À´×ÔÏàÁÚÂ·ÓÉÆ÷µÄÂ·ÓÉ±í 
-            printf("½ÓÊÕµ½µÄÂ·ÓÉĞÅÏ¢:\n");
-            prt(rtu, count2);
-            updateRIP(rt, &count, rtu, &count2);
-            printf("¸üĞÂºóµÄÂ·ÓÉĞÅÏ¢:\n");
-            prt(rt, count);
-        }
-        */
+
         printf("\n\t\tÄ£ÄâRIPÍøÂçµÄÔËĞĞ½á¹ûÊä³öÍê±Ï£¬°´ÈÎÒâ¼ü·µ»Ø³õÊ¼½çÃæ\n");
         printf("\n\t\t");
         system("pause");
@@ -721,6 +734,6 @@ int main() {
     initNetwork(&network);
     login_func(network);  //ÏµÍ³²Ëµ¥
     clock_t end = clock();
-    printf("\n\t\tÔËĞĞÊ±¼ä %lf seconds\n", (double)(end - begin) / CLOCKS_PER_SEC);
+    printf("\n\t\tÔËĞĞÊ±¼ä %.3lf seconds\n", (double)(end - begin) / CLOCKS_PER_SEC);
     return 0;
 }
