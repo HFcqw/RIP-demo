@@ -7,8 +7,9 @@ void initNeighborCount(Network* network);
 int getRouterPos(Network* g, RouterType vertex);
 int getFirstNeighbor(Network* g, RouterType vertex);
 int getNextNeighbor(Network* g, RouterType vertex1, RouterType vertex2);
+int getNetworkPos(Network* g, NetworkType net);
 int initRoutingTable(Router* router);
-void triggerUpdate(Network* network, RouterType routerID);
+void updateRoutingTable(Network* network, RouterType routerID);
 void updateRouter(Network* network, RouterType routerID);
 /*********
 * 一、初始化。配置路由器的图和直连网络（手动输入或读取文件）
@@ -65,19 +66,12 @@ void initNetworkFile(Network* network) {   // 采用邻接表存储结构，由文本文件构造
     }
 
     fscanf_s(ff, "%d", &network->networkCount);
-    //printf("%d\n", network->networkCount);
     for (i = 0; i < network->routerCount; i++) {
         fscanf_s(ff, "%d", &network->RL[i].dirnetworkCount);
-        //printf("%d-", network->RL[i].dirnetworkCount);
         for (j = 0; j < network->routerCount;j++) {
             char c = fgetc(ff);
-            //fscanf_s(ff, "%c ", &network->RL[i].dirNetworkID[j]);  
             if (j == 0)  continue;
-            else{ 
-                //printf("%c", c);
-                network->RL[i].dirNetworkID[j-1] = c;
-                //printf("%c", network->RL[i].dirNetworkID[j-1]);
-            }
+            else network->RL[i].dirNetworkID[j-1] = c;
         }
     }
     fclose(fp); // 关闭数据文件fp
@@ -87,20 +81,26 @@ void initNetworkFile(Network* network) {   // 采用邻接表存储结构，由文本文件构造
 void initRouter(Network* network) {    // 手动输入网络路由器配置
     int i, j, k;
     Neighbor* e;
-    printf("\t\t请输入网络中路由器数:\n\t\t");
+    printf("\t\t请输入网络中路由器数：\n\t\t");
     scanf_s("%d", &network->routerCount);   //给出图的顶点数n
     getchar();
-    printf("\t\t请输入路由器构成的图的边数:\n\t\t");
+    printf("\t\t请输入路由器构成的图的边数：\n\t\t");
     scanf_s("%d", &network->edgeCount);   //给出图的边数e
     getchar();
-    printf("\t\t请输入路由器网络号（输入格式：A B C D E F）:\n\t\t");
+    printf("\t\t请输入路由器网络号（输入格式：A B C D E F）：\n\t\t");
     for (i = 0; i < network->routerCount; i++) {    
         scanf_s("%c", &network->RL[i].routerID,1);    //输入n个字符，表示n个顶点的数据元素的值（结点集）
         network->RL[i].neighbors = NULL;    //初始化表头指针域为NULL
     }
     for (k = 0; k < network->edgeCount; k++) {  
-        printf("\t\t请输入边（Vi,Vj）上的顶点序号对i j（输入整数，以空格间隔，格式：0 1）：\n\t\t");
-        scanf_s("%d %d", &i, &j);   //输入e行数据对，表示每条边的两个顶点编号,构建邻接表（边集）
+        RouterType vertex1, vertex2;
+        printf("\t\t请输入边（Vi,Vj）上的路由器网络号（输入字符，格式：A D）：\n\t\t");
+        scanf_s("\n%c", &vertex1, 1);
+        scanf_s("\n%c", &vertex2, 1);
+        int i = getRouterPos(network, vertex1);
+        int j = getRouterPos(network, vertex2);
+        if (i == -1 || j == -1) return;
+
         e = (Neighbor*)malloc(sizeof(Neighbor));    //生成一个新节点
         e->neighborID = j;
         e->next = network->RL[i].neighbors; //头插法建立新节点
@@ -148,29 +148,73 @@ void initNeighborCount(Network* network) {  //获取邻居路由器数量，初始化Neighbor
 * * 查找图中是否存在某个顶点，获取某个顶点的第一个邻接结点、获取某个顶点的邻接结点的下一个结点
 *********/
 
+int getRouterPos(Network* g, RouterType vertex) {    // 查找图g中是否存在顶点v，存在则返回该顶点在图中位置；否则返回 -1
+    for (int i = 0; i < g->routerCount; ++i) {
+        if (g->RL[i].routerID == vertex)
+            return i;
+    }
+    return -1;
+}
+
+int getFirstNeighbor(Network* g, RouterType vertex) { //获取某个顶点的第一个邻接结点
+    int v = getRouterPos(g, vertex);
+    if (v == -1) return -1;
+    Neighbor* p = g->RL[v].neighbors;
+    if (p != NULL) {
+        return p->neighborID;
+    }
+    return -1;
+}
+int getNextNeighbor(Network* g, RouterType vertex1, RouterType vertex2) { //求某个顶点（vertex1）的邻接结点（vertex2）的下一个结点
+    int v1 = getRouterPos(g, vertex1);
+    int v2 = getRouterPos(g, vertex2);
+    if (v1 == -1 || v2 == -1) return -1;
+    Neighbor* p = g->RL[v1].neighbors;
+    while (p != NULL && p->neighborID != v2) {
+        p = p->next;
+    }
+    if (p != NULL && p->next != NULL) {
+        return p->next->neighborID;
+    }
+    return -1;
+}
+
+int getNetworkPos(Network* g, NetworkType net) {    // 查找图g中是否存在网络net，存在则返回net连接的一个路由器；否则返回 -1
+    for (int i = 0; i < g->routerCount; ++i) {
+        for(int j=0;j<g->RL[i].dirnetworkCount;j++)
+        if (g->RL[i].dirNetworkID[j] == net)
+            return i;
+    }
+    return -1;
+}
+
 void insertRouter(Network* network) {
     if (network->routerCount == MAX_ROUTERS) return;
     int i, j, k;
     Neighbor* e;
-    printf("\t\t请输入该路由器的网络号:");
-    network->routerCount++;
-    scanf_s("%c", &network->RL[network->routerCount-1].routerID, 1);
-    getchar();
-    /*
-    if (getRouterPos(network, network->RL[network->routerCount-1].routerID) != -1) {
+    RouterType v=NULL;
+    printf("\t\t请输入该路由器的网络号：");
+    scanf_s("\n%c", &v, 1);
+    if (getRouterPos(network, v) != -1) {
         printf("\t\t该路由器已存在");
         return;
     }
-    */
-    printf("\t\t请输入该路由器的邻居路由器数:\n\t\t");
+    network->routerCount++;
+    network->RL[network->routerCount - 1].routerID = v;
+    printf("\t\t该路由器的序号为 %d\n", getRouterPos(network, network->RL[network->routerCount - 1].routerID));
+    printf("\t\t请输入该路由器的邻居路由器数：\n\t\t");
     scanf_s("%d", &network->RL[network->routerCount-1].neighborCount);
-    getchar();
-    //printf("\t\t请输入该路由器的邻居路由器数:\n\t\t");
     network->edgeCount += network->RL[network->routerCount-1].neighborCount;
     network->RL[network->routerCount].neighbors = NULL;    
-    for (k = 0; k < network->RL[network->routerCount-1].neighborCount; k++) {
-        printf("\t\t请输入边（Vi,Vj）上的顶点序号对i j（输入整型数字，以空格间隔，格式：0 1）：\n\t\t");
-        scanf_s("%d %d", &i, &j);   //输入e行数据对，表示每条边的两个顶点编号,构建邻接表（边集）
+    for (k = 0; k < network->RL[network->routerCount - 1].neighborCount; k++) {
+        RouterType vertex1, vertex2;
+        printf("\t\t请输入边（Vi,Vj）上的路由器网络号（输入字符，格式：A D）：\n\t\t");
+        scanf_s("\n%c", &vertex1, 1);
+        scanf_s("\n%c", &vertex2, 1);
+        int i = getRouterPos(network, vertex1);
+        int j = getRouterPos(network, vertex2);
+        if (i == -1 || j == -1) return;
+
         e = (Neighbor*)malloc(sizeof(Neighbor));    //生成一个新节点
         e->neighborID = j;
         e->next = network->RL[i].neighbors; //头插法建立新节点
@@ -180,32 +224,34 @@ void insertRouter(Network* network) {
         e->next = network->RL[j].neighbors;
         network->RL[j].neighbors = e;
     }
-    i = network->routerCount;
-    printf("\t\t请输入路由器 %c 的直连网络数（输入整型数字）:\n\t\t", network->RL[i].routerID);
-    scanf_s("%d", &network->RL[i].dirnetworkCount);
-    network->networkCount += network->RL[i].dirnetworkCount;
-    for (j = 0; j < network->RL[i].dirnetworkCount; j++) {
-        printf("\t\t请输入路由器 %c 直连网络的网络号（输入单个字符）: ", network->RL[i].routerID);
-        scanf_s("%c", &network->RL[i].dirNetworkID[j]);
+    printf("\t\t请输入路由器 %c 的直连网络数（输入整型数字）：\n\t\t", network->RL[network->routerCount-1].routerID);
+    scanf_s("\n%d", &network->RL[network->routerCount -1].dirnetworkCount);
+    network->networkCount += network->RL[network->routerCount-1].dirnetworkCount;
+    for (j = 0; j < network->RL[network->routerCount - 1].dirnetworkCount; j++) {
+        printf("\t\t请输入路由器 %c 直连网络的网络号（输入单个字符）：", network->RL[network->routerCount-1].routerID);
+        scanf_s("%c", &network->RL[network->routerCount - 1].dirNetworkID[j]);
         char c = getchar();
-        network->RL[i].dirNetworkID[j] = c;
-     }
+        network->RL[network->routerCount - 1].dirNetworkID[j] = c;
+    }
 }
 
 void deleteRouter(Network* g) {
-    RouterType v;
-    printf("\t\t请输入该路由器的网络号:");
-    scanf_s("%c", &v, 1);
-    //getchar();
-    int n = getRouterPos(g, v);
-    if (n == -1) return;
-    //1.遍历删除顶点的边表，找到所关联的顶点有哪些
-    Neighbor* p = g->RL[v].neighbors;
-    int k;
+    RouterType vertex = NULL;
+    printf("\t\t请输入该路由器的网络号：");
+    scanf_s("\n%c", &vertex, 1);
+    int v = getRouterPos(g, vertex);
+    if (v == -1) {
+        printf("\t\t该路由器不存在");
+        return;
+    }
+    Neighbor* p = (Neighbor*)malloc(sizeof(Neighbor));
+    p= g->RL[v].neighbors;
     Neighbor* t = NULL;
-    Neighbor* s;
-    while (p != NULL){
+    Neighbor* s = (Neighbor*)malloc(sizeof(Neighbor));
+    int k;
+    while (p != NULL){  //遍历删除顶点的边表，找到所关联的顶点
         k = p->neighborID;
+        s = (Neighbor*)malloc(sizeof(Neighbor));
         s = g->RL[k].neighbors; //s指向与删除顶点关联的顶点的第一个边结点
         while (s != NULL && s->neighborID != v) {   //遍历边表有没有要删除的顶点的序号
             t = s;  //t指向s，保存前驱
@@ -214,13 +260,15 @@ void deleteRouter(Network* g) {
         if (s != NULL){ //则此时已经找到了要删除顶点的序号
             if (t == NULL) {  //删除的节点正好是第一个，因为t一开始就初始化为NULL，没有经过上面的while循环
                 g->RL[k].neighbors = s->next;
-            }else{
-                t->next = s->next;  //t指向删除节点序号的前驱，s指向要删除节点的序号
             }
+            else t->next = s->next;  //t指向删除节点序号的前驱，s指向要删除节点的序号
             free(s);
         }
         //其他顶点的边表中没有要删除的顶点的序号了，可以放心删除要删除的顶点所关联的边表节点，因为其他顶点已经解除了和这个顶点的关系
-        g->RL[v].neighbors = p->next;//头删
+        if (p->next != NULL) {
+            g->RL[v].neighbors = p->next;//头删
+        }
+        g->RL[v].neighbors = NULL;
         free(p);
         p = g->RL[v].neighbors;//第一个边结点结束，开始对下一个边表结点查找
     }
@@ -228,7 +276,7 @@ void deleteRouter(Network* g) {
     g->RL[v].routerID = g->RL[g->routerCount].routerID;//用最后一个结点的覆盖删除的
     g->RL[v].neighbors = g->RL[g->routerCount].neighbors;
 
-    //调整信息，把原来与最后一个顶点相连的顶点的边信息的dest修改为v（即删除的顶点的位置），其他顶点的边表中关于最后一个顶点的序号改为v
+    //调整信息，把原来与最后一个顶点相连的顶点的边信息dest修改为v（即删除的顶点的位置），其他顶点的边表中关于最后一个顶点的序号改为v
     s = g->RL[v].neighbors;//s指向最后一个顶点的边表
     while (s != NULL){
         k = s->neighborID;//因为是无向图，我的边表里有你，你的边表里也有我，在最后一个顶点的边表中找到关联的其他顶点序号
@@ -246,11 +294,13 @@ void deleteRouter(Network* g) {
 
 void insertEdge(Network* g){ //插入边
     RouterType vertex1, vertex2;
-    printf("\t\t请输入边（Vi,Vj）上的顶点序号对i j（输入整型数字，以空格间隔，格式：0 1）：\n\t\t");
-    scanf_s("%d %d", &vertex1, &vertex2);
+    printf("\t\t请输入边（Vi,Vj）上的路由器网络号（输入字符，格式：A D）：\n\t\t");
+    scanf_s("\n%c", &vertex1, 1);
+    scanf_s("\n%c", &vertex2, 1);
     int v1 = getRouterPos(g, vertex1);
     int v2 = getRouterPos(g, vertex2);
     if (v1 == -1 || v2 == -1) return;
+    
     Neighbor* s;
     //V1 --> V2  创建一个边表类型的节点，一共是8字节
     s = (Neighbor*)malloc(sizeof(Neighbor));
@@ -270,11 +320,13 @@ void insertEdge(Network* g){ //插入边
 
 void deleteEdge(Network *g){ //删除边
     RouterType vertex1, vertex2;
-    printf("\t\t请输入边（Vi,Vj）上的顶点序号对i j（输入整型数字，以空格间隔，格式：0 1）：\n\t\t");
-    scanf_s("%d %d", &vertex1, &vertex2);
+    printf("\t\t请输入边（Vi,Vj）上的路由器网络号（输入字符，格式：A D）：\n\t\t");
+    scanf_s("\n%c", &vertex1, 1);
+    scanf_s("\n%c", &vertex2, 1);
     int v1 = getRouterPos(g, vertex1);
     int v2 = getRouterPos(g, vertex2);
     if (v1 == -1 || v2 == -1) return;
+
     Neighbor* q = NULL; //q指向p的前驱
     Neighbor* p;
     //v1 -- > v2   如B-C的这一条边
@@ -306,70 +358,71 @@ void deleteEdge(Network *g){ //删除边
     g->edgeCount--;
 }
 
-void insertDirNetwork(Network* network) {
+void insertDirNetwork(Network* network) {   //给路由器添加直连网络
     int i, j, k;
-    printf("\t\t请输入网络总数（输入整型数字）:\n\t\t");
-    scanf_s("%d", &network->networkCount);
-    for (i = 0; i < network->routerCount; i++) {
-        printf("\t\t请输入路由器 %c 的直连网络数（输入整型数字）:\n\t\t", network->RL[i].routerID);
-        scanf_s("%d", &network->RL[i].dirnetworkCount);
-        //printf("%d", network->RL[i].dirnetworkCount);
-        for (j = 0; j < network->RL[i].dirnetworkCount; j++) {
-            printf("\t\t请输入路由器 %c 直连网络的网络号（输入单个字符）: ", network->RL[i].routerID);
-            scanf_s("%c", &network->RL[i].dirNetworkID[j]);
-            char c = getchar();
-            network->RL[i].dirNetworkID[j] = c;
-            //printf("%c", network->RL[i].dirNetworkID[j]);
-        }
+    RouterType v = NULL;
+    printf("\t\t请输入该路由器的网络号：");
+    scanf_s("\n%c", &v, 1);
+    i = getRouterPos(network, v);
+    if (i == -1) {
+        printf("\t\t该路由器不存在");
+        return;
+    }
+    printf("\t\t路由器 %c 现有的直连网络数为 %d ,分别为", v, network->RL[i].dirnetworkCount);
+    for (j = 0; j < network->RL[i].dirnetworkCount; j++) {
+        printf(" %c", network->RL[i].dirNetworkID[j]);
+    }
+    printf("，可连接的直连网络数最大为 %d\n", MAX_NETWORKS);
+    int num;
+    NetworkType net = NULL;
+    printf("\t\t请输入需要添加的直连网络数（输入整型数字）：");
+    scanf_s("%d", &num);
+    if (network->RL[i].dirnetworkCount + num > MAX_NETWORKS) {
+        printf("\t\t超过了路由器的直连网络数的最大值\n");
+        return;
+    }
+    j = network->RL[i].dirnetworkCount;
+    network->RL[i].dirnetworkCount += num;
+    for (j; j < network->RL[i].dirnetworkCount; j++) {
+        printf("\t\t请输入需要添加的直连网络号（输入单个字符）：");
+        scanf_s("\n%c", &net);
+        network->RL[i].dirNetworkID[j]=net;
     }
 }
-void deleteDirNetwork(Network* network) {
+void deleteDirNetwork(Network* network) {   //删除路由器的直连网络
     int i, j, k;
-    printf("\t\t请输入网络总数（输入整型数字）:\n\t\t");
-    scanf_s("%d", &network->networkCount);
-    for (i = 0; i < network->routerCount; i++) {
-        printf("\t\t请输入路由器 %c 的直连网络数（输入整型数字）:\n\t\t", network->RL[i].routerID);
-        scanf_s("%d", &network->RL[i].dirnetworkCount);
-        //printf("%d", network->RL[i].dirnetworkCount);
-        for (j = 0; j < network->RL[i].dirnetworkCount; j++) {
-            printf("\t\t请输入路由器 %c 直连网络的网络号（输入单个字符）: ", network->RL[i].routerID);
-            scanf_s("%c", &network->RL[i].dirNetworkID[j]);
-            char c = getchar();
-            network->RL[i].dirNetworkID[j] = c;
-            //printf("%c", network->RL[i].dirNetworkID[j]);
+    RouterType v = NULL;
+    printf("\t\t请输入该路由器的网络号：");
+    scanf_s("\n%c", &v, 1);
+    i = getRouterPos(network, v);
+    if (i == -1) {
+        printf("\t\t该路由器不存在");
+        return;
+    }
+    printf("\t\t路由器 %c 现有的直连网络数为 %d ,分别为", v, network->RL[i].dirnetworkCount);
+    for (j = 0; j < network->RL[i].dirnetworkCount; j++) {
+        printf(" %c", network->RL[i].dirNetworkID[j]);
+    }
+    int num;
+    NetworkType net = NULL;
+    printf("\n\t\t请输入需要删除的直连网络数（输入整型数字）：");
+    scanf_s("%d", &num);
+    if (network->RL[i].dirnetworkCount - num < 0) {
+        printf("\t\t超过了路由器的直连网络数\n");
+        return;
+    }
+    j = network->RL[i].dirnetworkCount;
+    for (k= network->RL[i].dirnetworkCount-num; k < j; k++) {
+        //printf("%d %d", k, j);
+        printf("\t\t请输入需要删除的直连网络号（输入单个字符）：");
+        scanf_s("\n%c", &net);
+        if (getNetworkPos(network, net) == -1) {
+            printf("\t\t这个网络不存在\n");
+            return;
         }
+        network->RL[i].dirNetworkID[k] = NULL;
     }
-}
-
-int getRouterPos(Network* g, RouterType vertex) {    // 查找图g中是否存在顶点v，存在则返回该顶点在图中位置；否则返回 -1
-    for (int i = 0; i < g->routerCount; ++i) {
-        if (g->RL[i].routerID == vertex)
-            return i;
-    }
-    return -1;
-}
-
-int getFirstNeighbor(Network* g, RouterType vertex) { //获取某个顶点的第一个邻接结点
-    int v = getRouterPos(g, vertex);
-    if (v == -1) return -1;
-    Neighbor* p = g->RL[v].neighbors;
-    if (p != NULL) {
-        return p->neighborID;
-    }
-    return -1;
-}
-int getNextNeighbor(Network* g, RouterType vertex1, RouterType vertex2) { //求某个顶点（vertex1）的邻接结点（vertex2）的下一个结点
-    int v1 = getRouterPos(g, vertex1);
-    int v2 = getRouterPos(g, vertex2);
-    if (v1 == -1 || v2 == -1) return -1;
-    Neighbor* p = g->RL[v1].neighbors;
-    while (p != NULL && p->neighborID != v2) {
-        p = p->next;
-    }
-    if (p != NULL && p->next != NULL) {
-        return p->next->neighborID;
-    }
-    return -1;
+    network->RL[i].dirnetworkCount -= num;
 }
 
 /*********
@@ -402,7 +455,7 @@ int initRoutingTable(Router* router) {  //目的网络 距离 下一跳
 
 RouterType inputRouterID(Network network) {
 input:
-    printf("\t\t请输入需要触发更新的路由器名称：");
+    printf("\t\t请输入需要进行更新的路由器名称：");
     char routerID;
     scanf_s("\n%c", &routerID);
     if (getRouterPos(&network, routerID) == -1) {
@@ -410,12 +463,12 @@ input:
         goto input;
     }
     else {
-        printf("\n\t\t/***邻接路由器%c的触发更新：***/\n", routerID);
+        printf("\n\t\t/***路由器 %c 进行更新***/\n\n", routerID);
         return routerID;
     }
 }
 
-void triggerUpdate(Network* network, RouterType routerID) {    //路由选择和路由更新
+void updateRoutingTable(Network* network, RouterType routerID) {    //路由选择和路由更新
     Router* router = NULL;
     router = &network->RL[getRouterPos(network, routerID)];    // 查找指定路由器ID
     int i, j, k;
@@ -510,21 +563,13 @@ void updateRouter(Network* network, RouterType routerID) {
     char NRouterID = network->RL[neighbor->neighborID].routerID;
     while (neighbor != NULL && NRouterID != router->routerID && updateFlag != 1) {  //遍历A的邻接路由器
         NRouterID = network->RL[neighbor->neighborID].routerID;
-        printf("\t\t/***邻接路由器%c的触发更新：***/\n\n", NRouterID);
-        triggerUpdate(network, NRouterID);
+        printf("\t\t/***邻接路由器 %c 进行更新***/\n\n", NRouterID);
+        updateRoutingTable(network, NRouterID);
         neighbor = neighbor->next;
     }
-    /*
-    router = &network->RL[getRouterPos(network, routerID)];    // 查找指定路由器ID
-    neighbor = router->neighbors;
-    updateFlag = 0;
-    NRouterID = network->RL[neighbor->neighborID].routerID;
-    printf("\t\t/***邻接路由器%c的触发更新：/***\n\n", NRouterID);
-    triggerUpdate(network, NRouterID);
-    */
 }
 
-int selectBestRoute(Router* router, int networkID) {    //选择最佳路由
+int selectBestPaths(Router* router, int networkID) {    //选择最佳路由
     int i;
     int minDistance = -1;
     int bestRoute = -1;
@@ -537,6 +582,17 @@ int selectBestRoute(Router* router, int networkID) {    //选择最佳路由
         }
     }
     return bestRoute;
+}
+// 输出最佳路径
+void printBestPaths(Router* router) {
+    printf("Router %d Best Paths:\n", router->routerID);
+
+    for (int i = 0; i < router->rtcount; i++) {
+        RoutingTable* entry = &(router->routingTable[i]);
+        if (entry->nextHop != -1) {
+            printf("Destination: %d, Next Hop: %d, Distance: %d\n", entry->networkID, entry->nextHop, entry->distance);
+        }
+    }
 }
 
 /*********
@@ -559,6 +615,7 @@ void displayRoutingTable(Network network) { // 显示路由表内容
 void displayNetworkSetting(Network network) {   // 显示网络配置
     int i, j;
     Neighbor* e;
+    e = (Neighbor*)malloc(sizeof(Neighbor));
     if (network.routerCount == 0) {
         printf("\t\t当前网络已初始化\n");
         return;
@@ -586,10 +643,10 @@ void displayNetworkSetting(Network network) {   // 显示网络配置
     }
     for (i = 0; i < network.routerCount; i++) {
         if (network.RL[i].dirnetworkCount == 0) {
-                printf("\t\t路由器%c 没有直连网络\n", network.RL[i].routerID);
+                printf("\n\t\t路由器%c 没有直连网络\n", network.RL[i].routerID);
         }
         else {
-            printf("\n\t\t路由器%c 的直连网络数为 %d，路由器的直连网络为", network.RL[i].routerID, network.RL[i].dirnetworkCount);
+            printf("\n\t\t路由器%c 的直连网络数为 %d，路由器的直连网络分别为", network.RL[i].routerID, network.RL[i].dirnetworkCount);
             for (j = 0; j < network.RL[i].dirnetworkCount; j++) {
                 printf(" %c ", network.RL[i].dirNetworkID[j]);
             }
@@ -654,6 +711,7 @@ start:
     case 2:
         initRouter(&network);
         initDesNetwork(&network);
+        initNeighborCount(&network);
         printf("\n\t\t您已完成手动配置网络操作，按任意键返回初始界面\n");
         printf("\n\t\t");
         system("pause");
@@ -661,42 +719,54 @@ start:
         break;
     case 3:
         insertRouter(&network);
-        printf("\n\t\t您已完成添加路由器操作，按任意键返回初始界面\n");
+        initNeighborCount(&network);
+        printf("\n\t\t当前网络连接的配置如下：\n");
+        displayNetworkSetting(network);
+        printf("\n\t\t您已完成添加路由器操作，当前网络连接的配置如下：\n\n");
+        displayNetworkSetting(network);
         printf("\n\t\t");
         system("pause");
         goto start;
         break;
     case 4:
         deleteRouter(&network);
-        printf("\n\t\t您已完成删除路由器操作，按任意键返回初始界面\n");
+        initNeighborCount(&network);
+        printf("\n\t\t您已完成删除路由器操作，当前网络连接的配置如下：\n\n");
+        displayNetworkSetting(network);
         printf("\n\t\t");
         system("pause");
         goto start;
         break;
     case 5:
         insertEdge(&network);
-        printf("\n\t\t您已完成添加路由器连接操作，按任意键返回初始界面\n");
+        initNeighborCount(&network);
+        printf("\n\t\t您已完成添加路由器连接操作，当前网络连接的配置如下：\n\n");
+        displayNetworkSetting(network);
         printf("\n\t\t");
         system("pause");
         goto start;
         break;
     case 6:
         deleteEdge(&network);
-        printf("\n\t\t您已完成删除路由器连接操作，按任意键返回初始界面\n");
+        initNeighborCount(&network);
+        printf("\n\t\t您已完成删除路由器连接操作，当前网络连接的配置如下：\n\n");
+        displayNetworkSetting(network);
         printf("\n\t\t");
         system("pause");
         goto start;
         break;
     case 7:
         insertDirNetwork(&network);
-        printf("\n\t\t您已完成添加路由器的直连网络操作，按任意键返回初始界面\n");
+        printf("\n\t\t您已完成添加路由器的直连网络操作，当前网络连接的配置如下：\n\n");
+        displayNetworkSetting(network);
         printf("\n\t\t");
         system("pause");
         goto start;
         break;
     case 8:
         deleteDirNetwork(&network);
-        printf("\n\t\t您已完成删除路由器的直连网络操作，按任意键返回初始界面\n");
+        printf("\n\t\t您已完成删除路由器的直连网络操作，当前网络连接的配置如下：\n\n");
+        displayNetworkSetting(network);
         printf("\n\t\t");
         system("pause");
         goto start;
@@ -714,10 +784,9 @@ start:
         for (int i = 0; i < network.routerCount; i++) {
             initRoutingTable(&network.RL[i]);
         }
-        triggerUpdate(&network, inputRouterID(network));
+        updateRoutingTable(&network, inputRouterID(network));
         printf("\n\t\t打印运行结果：\n");
         displayRoutingTable(network);
-
         printf("\n\t\t模拟RIP网络的运行结果输出完毕，按任意键返回初始界面\n");
         printf("\n\t\t");
         system("pause");
